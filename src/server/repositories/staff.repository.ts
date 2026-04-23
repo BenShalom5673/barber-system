@@ -1,9 +1,10 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 import { staffProfiles, staffServices } from '@/server/db/schema';
-import type { InferSelectModel } from 'drizzle-orm';
+import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 
 export type StaffProfile = InferSelectModel<typeof staffProfiles>;
+export type NewStaffProfile = InferInsertModel<typeof staffProfiles>;
 
 /**
  * Finds an active staff profile by id scoped to the given barbershop.
@@ -40,7 +41,8 @@ export async function findActiveStaffByBarbershop(
         eq(staffProfiles.barbershopId, barbershopId),
         eq(staffProfiles.isActive, true),
       ),
-    );
+    )
+    .orderBy(asc(staffProfiles.createdAt));
 }
 
 /**
@@ -86,6 +88,61 @@ export async function findStaffByInvitationEmail(
       ),
     )
     .limit(1);
+
+  return result[0] ?? null;
+}
+
+export async function createStaffProfile(data: NewStaffProfile): Promise<StaffProfile> {
+  const result = await db.insert(staffProfiles).values(data).returning();
+  const row = result[0];
+  if (!row) throw new Error('Failed to create staff profile — no row returned.');
+  return row;
+}
+
+/**
+ * Updates editable fields on an active staff profile.
+ * Returns null if no active profile with that id exists in the barbershop.
+ */
+export async function updateStaffProfile(
+  barbershopId: string,
+  id: string,
+  data: Partial<Pick<NewStaffProfile, 'displayName' | 'bio' | 'avatarUrl' | 'invitationEmail'>>,
+): Promise<StaffProfile | null> {
+  const result = await db
+    .update(staffProfiles)
+    .set({ ...data, updatedAt: new Date() })
+    .where(
+      and(
+        eq(staffProfiles.id, id),
+        eq(staffProfiles.barbershopId, barbershopId),
+        eq(staffProfiles.isActive, true),
+      ),
+    )
+    .returning();
+
+  return result[0] ?? null;
+}
+
+/**
+ * Soft-deletes a staff profile by setting isActive = false.
+ * Returns null if no active profile with that id exists in the barbershop.
+ * Does NOT delete the row — historical appointments reference this profile.
+ */
+export async function deactivateStaffProfile(
+  barbershopId: string,
+  id: string,
+): Promise<StaffProfile | null> {
+  const result = await db
+    .update(staffProfiles)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(staffProfiles.id, id),
+        eq(staffProfiles.barbershopId, barbershopId),
+        eq(staffProfiles.isActive, true),
+      ),
+    )
+    .returning();
 
   return result[0] ?? null;
 }

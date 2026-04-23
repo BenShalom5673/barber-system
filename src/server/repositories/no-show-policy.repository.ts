@@ -21,26 +21,29 @@ export async function findNoShowPolicies(
 }
 
 /**
- * Replaces the entire no-show policy for a barbershop atomically.
+ * Replaces the entire no-show policy for a barbershop.
  * Deletes all existing rows for the barbershop, then inserts the new set.
- * Callers must pass a non-empty array; an empty array clears the policy entirely.
+ * An empty array clears the policy entirely.
+ *
+ * TODO: Make this transactional (DELETE + INSERT as a single atomic operation)
+ * once the project migrates from neon-http to a transaction-capable driver
+ * (e.g. neon-serverless WebSocket driver or a standard pg pool).
+ * Currently neon-http does not support db.transaction().
  */
 export async function replaceNoShowPolicies(
   barbershopId: string,
   rows: Array<{ offenseNumber: number; chargePercent: number }>,
 ): Promise<NoShowPolicy[]> {
-  return db.transaction(async (tx) => {
-    await tx
-      .delete(noShowPolicies)
-      .where(eq(noShowPolicies.barbershopId, barbershopId));
+  await db
+    .delete(noShowPolicies)
+    .where(eq(noShowPolicies.barbershopId, barbershopId));
 
-    if (rows.length === 0) return [];
+  if (rows.length === 0) return [];
 
-    const inserted = await tx
-      .insert(noShowPolicies)
-      .values(rows.map((r) => ({ ...r, barbershopId })))
-      .returning();
+  const inserted = await db
+    .insert(noShowPolicies)
+    .values(rows.map((r) => ({ ...r, barbershopId })))
+    .returning();
 
-    return inserted.sort((a, b) => a.offenseNumber - b.offenseNumber);
-  });
+  return inserted.sort((a, b) => a.offenseNumber - b.offenseNumber);
 }

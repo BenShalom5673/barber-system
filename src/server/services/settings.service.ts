@@ -156,6 +156,15 @@ export async function requireBusinessProfile(
 // ─── Operational settings ─────────────────────────────────────────────────────
 
 /**
+ * Returns the operational settings row, or null if not yet configured.
+ */
+export async function getOperationalSettings(
+  barbershopId: string,
+): Promise<BarbershopSettings | null> {
+  return findBarbershopSettings(barbershopId);
+}
+
+/**
  * Saves (upserts) the operational settings for a barbershop.
  * Creates the settings row on first call; updates it on subsequent calls.
  * All fields are optional — only provided fields are written on update.
