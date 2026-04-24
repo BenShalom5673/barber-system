@@ -1,4 +1,4 @@
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, sql } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 import { staffProfiles, staffServices } from '@/server/db/schema';
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
@@ -145,6 +145,41 @@ export async function deactivateStaffProfile(
     .returning();
 
   return result[0] ?? null;
+}
+
+/**
+ * Returns active staff for a barbershop who can provide the given service.
+ *
+ * Per-staff assignment rule:
+ *   - Staff with NO staff_services rows → included (offers all services)
+ *   - Staff with staff_services rows that include serviceId → included
+ *   - Staff with staff_services rows that do NOT include serviceId → excluded
+ */
+export async function findActiveStaffForService(
+  barbershopId: string,
+  serviceId: string,
+): Promise<StaffProfile[]> {
+  return db
+    .select()
+    .from(staffProfiles)
+    .where(
+      and(
+        eq(staffProfiles.barbershopId, barbershopId),
+        eq(staffProfiles.isActive, true),
+        sql`(
+          NOT EXISTS (
+            SELECT 1 FROM staff_services
+            WHERE staff_profile_id = ${staffProfiles.id}
+          )
+          OR EXISTS (
+            SELECT 1 FROM staff_services
+            WHERE staff_profile_id = ${staffProfiles.id}
+              AND service_id = ${serviceId}::uuid
+          )
+        )`,
+      ),
+    )
+    .orderBy(asc(staffProfiles.createdAt));
 }
 
 /**
