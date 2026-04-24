@@ -8,6 +8,7 @@ import {
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 
 export type StaffWorkingHours = InferSelectModel<typeof staffWorkingHours>;
+export type NewStaffWorkingHours = InferInsertModel<typeof staffWorkingHours>;
 export type StaffScheduleOverride = InferSelectModel<typeof staffScheduleOverrides>;
 export type BarbershopSettings = InferSelectModel<typeof barbershopSettings>;
 export type NewBarbershopSettings = InferInsertModel<typeof barbershopSettings>;
@@ -47,6 +48,18 @@ export async function findOverridesForDate(
         eq(staffScheduleOverrides.overrideDate, dateStr),
       ),
     );
+}
+
+export async function deleteWorkingHoursForStaff(staffProfileId: string): Promise<void> {
+  await db
+    .delete(staffWorkingHours)
+    .where(eq(staffWorkingHours.staffProfileId, staffProfileId));
+}
+
+export async function insertWorkingHours(
+  rows: NewStaffWorkingHours[],
+): Promise<StaffWorkingHours[]> {
+  return db.insert(staffWorkingHours).values(rows).returning();
 }
 
 /**

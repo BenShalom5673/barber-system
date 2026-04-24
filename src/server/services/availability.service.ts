@@ -43,9 +43,9 @@ export interface GetAvailableSlotsParams {
 }
 
 export interface SlotEntry {
-  /** ISO 8601 UTC */
+  /** ISO 8601 with timezone offset (local barbershop time), e.g. "2026-04-23T12:00:00+03:00" */
   start: string;
-  /** ISO 8601 UTC — equals start + service.durationMinutes (buffer excluded from end) */
+  /** ISO 8601 with timezone offset — equals start + service.durationMinutes (buffer excluded from end) */
   end: string;
 }
 
@@ -328,9 +328,9 @@ async function computeSlotsForStaff(
 
     if (!overlaps) {
       slots.push({
-        start: slotStart.toISOString(),
+        start: formatLocalIso(slotStart, timezone),
         // end is service duration only — buffer is internal and not exposed to callers
-        end: new Date(slotStart.getTime() + serviceDurationMs).toISOString(),
+        end: formatLocalIso(new Date(slotStart.getTime() + serviceDurationMs), timezone),
       });
     }
   }
@@ -388,4 +388,51 @@ function parseTstzrange(raw: string): { start: Date; end: Date } {
   const startStr = inner.slice(0, commaIdx).replace(/"/g, '').trim();
   const endStr = inner.slice(commaIdx + 1).replace(/"/g, '').trim();
   return { start: new Date(startStr), end: new Date(endStr) };
+}
+
+/**
+ * Converts a UTC Date to an ISO 8601 string in the given IANA timezone,
+ * including the correct UTC offset for that instant (DST-aware via Intl).
+ * Example: 2026-04-23T09:00:00Z in Asia/Jerusalem → "2026-04-23T12:00:00+03:00"
+ */
+function formatLocalIso(date: Date, timezone: string): string {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const parts = fmt.formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+
+  let h = parseInt(get('hour'), 10);
+  if (h === 24) h = 0;
+
+  // Reconstruct the local epoch to compute the actual offset at this instant
+  const localMs = Date.UTC(
+    parseInt(get('year'), 10),
+    parseInt(get('month'), 10) - 1,
+    parseInt(get('day'), 10),
+    h,
+    parseInt(get('minute'), 10),
+    parseInt(get('second'), 10),
+  );
+
+  const offsetMs = localMs - date.getTime();
+  const sign = offsetMs >= 0 ? '+' : '-';
+  const absMs = Math.abs(offsetMs);
+  const oh = Math.floor(absMs / 3_600_000);
+  const om = Math.floor((absMs % 3_600_000) / 60_000);
+
+  const hh = String(h).padStart(2, '0');
+  return (
+    `${get('year')}-${get('month')}-${get('day')}T` +
+    `${hh}:${get('minute')}:${get('second')}` +
+    `${sign}${String(oh).padStart(2, '0')}:${String(om).padStart(2, '0')}`
+  );
 }

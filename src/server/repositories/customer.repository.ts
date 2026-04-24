@@ -39,6 +39,36 @@ export async function createCustomer(data: NewCustomer): Promise<Customer> {
   return row;
 }
 
+/**
+ * Inserts a customer row, silently ignoring a UNIQUE(barbershop_id, phone) conflict.
+ * Returns the newly inserted row, or null if a row with that phone already existed.
+ * Callers must fall back to findCustomerByPhone on a null return.
+ */
+export async function insertCustomerIfNotExists(data: NewCustomer): Promise<Customer | null> {
+  const result = await db.insert(customers).values(data).onConflictDoNothing().returning();
+  return result[0] ?? null;
+}
+
+/**
+ * Updates mutable profile fields (name, email, birthDate) on an existing customer.
+ * Only fields included in data are written. Callers must filter out empty/null values
+ * before calling — this function writes exactly what it receives.
+ */
+export async function updateCustomerProfile(
+  barbershopId: string,
+  id: string,
+  data: { name?: string; email?: string; birthDate?: string },
+): Promise<Customer> {
+  const result = await db
+    .update(customers)
+    .set({ ...data, updatedAt: new Date() })
+    .where(and(eq(customers.id, id), eq(customers.barbershopId, barbershopId)))
+    .returning();
+  const row = result[0];
+  if (!row) throw new Error(`Customer ${id} not found during profile update.`);
+  return row;
+}
+
 export async function updateCustomerStatus(
   barbershopId: string,
   id: string,

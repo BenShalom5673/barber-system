@@ -1,7 +1,8 @@
 import { normalisePhone } from '@/lib/slot-utils';
 import {
   findCustomerByPhone,
-  createCustomer,
+  insertCustomerIfNotExists,
+  updateCustomerProfile,
   type Customer,
 } from '@/server/repositories/customer.repository';
 
@@ -10,25 +11,23 @@ export interface FindOrCreateCustomerParams {
   phone: string;
   name: string;
   email?: string;
+  /** YYYY-MM-DD */
+  birthDate?: string;
 }
 
 /**
  * Looks up a customer by (barbershopId, normalised phone).
- * Creates the customer record if one does not exist.
- * Returns the existing or newly created customer.
  *
- * NOTE: This does NOT check customer status. The caller (booking service)
- * is responsible for enforcing status rules:
- *   - 'irrelevant' → blocked in all contexts
- *   - 'restricted' → blocked in online flow, allowed in manual
- *   - 'active' / 'vacation' → allowed
+ * If the customer exists: updates name, email, and birthDate with any
+ * non-empty values provided. Existing values are never overwritten with
+ * null or empty string.
  *
- * Race condition: if two concurrent requests both find no existing customer
- * and both attempt to insert, the DB UNIQUE(barbershop_id, phone) constraint
- * will reject one. The repository's createCustomer must use
- * INSERT ... ON CONFLICT DO NOTHING RETURNING * with a SELECT fallback.
- * TODO: Implement conflict-safe upsert in createCustomer before public booking
- * flow goes live.
+ * If the customer does not exist: inserts a new row using an
+ * ON CONFLICT DO NOTHING insert. If a concurrent request wins the race,
+ * falls back to a second phone lookup.
+ *
+ * Does NOT check customer status — the caller (booking service) enforces
+ * status rules ('irrelevant', 'restricted', etc.).
  */
 export async function findOrCreateCustomer(
   params: FindOrCreateCustomerParams,
@@ -36,15 +35,32 @@ export async function findOrCreateCustomer(
   const phone = normalisePhone(params.phone);
 
   const existing = await findCustomerByPhone(params.barbershopId, phone);
-  if (existing) return existing;
+  if (existing) {
+    const updates: { name?: string; email?: string; birthDate?: string } = {};
+    if (params.name) updates.name = params.name;
+    if (params.email) updates.email = params.email;
+    if (params.birthDate) updates.birthDate = params.birthDate;
 
-  return createCustomer({
+    if (Object.keys(updates).length > 0) {
+      return updateCustomerProfile(params.barbershopId, existing.id, updates);
+    }
+    return existing;
+  }
+
+  const inserted = await insertCustomerIfNotExists({
     barbershopId: params.barbershopId,
     phone,
     name: params.name,
     email: params.email ?? null,
+    birthDate: params.birthDate ?? null,
     status: 'active',
     noShowCount: 0,
     depositRequired: false,
   });
+  if (inserted) return inserted;
+
+  // Race condition: another concurrent request inserted first — re-fetch
+  const raceWinner = await findCustomerByPhone(params.barbershopId, phone);
+  if (raceWinner) return raceWinner;
+  throw new Error('Failed to find or create customer after conflict.');
 }

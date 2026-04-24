@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, boolean, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, boolean, unique, date } from 'drizzle-orm/pg-core';
 import { barbershops } from './barbershops';
 import { customerStatusEnum } from './types';
 
@@ -13,6 +13,7 @@ export const customers = pgTable(
     phone: text('phone').notNull(),
     name: text('name').notNull(),
     email: text('email'),
+    birthDate: date('birth_date'),
     notes: text('notes'),
     status: customerStatusEnum('status').notNull().default('active'),
     // Set automatically when no_show_count reaches the policy threshold,

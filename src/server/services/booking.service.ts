@@ -1,13 +1,14 @@
 import { toTstzrange } from '@/lib/slot-utils';
 import { findCustomerById } from '@/server/repositories/customer.repository';
 import { findServiceById } from '@/server/repositories/service.repository';
-import { findStaffById, staffOffersService } from '@/server/repositories/staff.repository';
+import { findStaffById, findActiveStaffForService } from '@/server/repositories/staff.repository';
 import { findBarbershopSettings } from '@/server/repositories/schedule.repository';
 import {
   createAppointment,
   type Appointment,
 } from '@/server/repositories/appointment.repository';
 import { getAvailableSlots } from './availability.service';
+import { findOrCreateCustomer } from './customer.service';
 import {
   CustomerRestrictedError,
   CustomerIrrelevantError,
@@ -23,6 +24,24 @@ import type { Service } from '@/server/repositories/service.repository';
 import type { Customer } from '@/server/repositories/customer.repository';
 
 const DEFAULT_BUFFER_MINUTES = 5;
+// Must match the timezone assumption in availability.service
+const DEFAULT_TIMEZONE = 'Asia/Jerusalem';
+
+// ─── Public interfaces ────────────────────────────────────────────────────────
+
+export interface BookAppointmentParams {
+  barbershopId: string;
+  staffProfileId: string;
+  serviceId: string;
+  /** Local ISO with offset, e.g. "2026-04-26T12:00:00+03:00" */
+  start: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  /** YYYY-MM-DD */
+  customerBirthDate?: string;
+  clientNotes?: string;
+}
 
 export interface CreateBookingParams {
   barbershopId: string;
@@ -42,6 +61,42 @@ export interface DepositConfig {
   value: number;
 }
 
+// ─── Public entry point (online booking flow) ─────────────────────────────────
+
+/**
+ * Resolves or creates the customer by phone number, then delegates to
+ * createBooking. The incoming start string (local ISO with offset) is parsed
+ * to the correct UTC instant by the JS Date constructor before being passed
+ * deeper — no manual offset arithmetic required.
+ */
+export async function bookAppointment(
+  params: BookAppointmentParams,
+): Promise<{ appointment: Appointment; depositConfig: DepositConfig | null }> {
+  // JS Date constructor correctly converts any ISO-with-offset string to a UTC instant.
+  // "2026-04-26T12:00:00+03:00" → internally 2026-04-26T09:00:00.000Z
+  const slotStart = new Date(params.start);
+
+  const customer = await findOrCreateCustomer({
+    barbershopId: params.barbershopId,
+    phone: params.customerPhone,
+    name: params.customerName,
+    ...(params.customerEmail !== undefined && { email: params.customerEmail }),
+    ...(params.customerBirthDate !== undefined && { birthDate: params.customerBirthDate }),
+  });
+
+  return createBooking({
+    barbershopId: params.barbershopId,
+    customerId: customer.id,
+    staffProfileId: params.staffProfileId,
+    serviceId: params.serviceId,
+    slotStart,
+    createdVia: 'online',
+    ...(params.clientNotes !== undefined && { clientNotes: params.clientNotes }),
+  });
+}
+
+// ─── Core booking logic ───────────────────────────────────────────────────────
+
 /**
  * Creates an appointment after validating all constraints.
  *
@@ -54,13 +109,12 @@ export interface DepositConfig {
  * 2. Customer status allows booking in this context (online vs manual).
  * 3. Service exists and is active.
  * 4. Staff exists and is active.
- * 5. Staff offers the requested service.
+ * 5. Staff offers the requested service (per-staff assignment rule).
  * 6. Slot is still available.
  * 7. Deposit configuration resolved.
  *
  * The DB-level GiST exclusion constraint is the final race-condition safety net.
- * A constraint violation on insert must be caught by the caller and mapped to
- * SlotNotAvailableError.
+ * A constraint violation on insert must be caught by the caller and mapped to 409.
  *
  * Immutable booking snapshots (price, duration, service name) are copied from
  * the service record at insert time and never updated.
@@ -93,21 +147,22 @@ export async function createBooking(
   const staff = await findStaffById(barbershopId, staffProfileId);
   if (!staff) throw new StaffNotFoundError(staffProfileId);
 
-  // 5. Staff ↔ service pairing
-  const offers = await staffOffersService(barbershopId, staffProfileId, serviceId);
-  if (!offers) throw new ServiceNotOfferedByStaffError(staffProfileId, serviceId);
+  // 5. Staff ↔ service pairing — uses same "no rows = all services" rule as availability engine
+  const eligibleStaff = await findActiveStaffForService(barbershopId, serviceId);
+  if (!eligibleStaff.some((s) => s.id === staffProfileId)) {
+    throw new ServiceNotOfferedByStaffError(staffProfileId, serviceId);
+  }
 
-  // 6. Slot availability (re-check just before insert)
-  const dateStr = slotStart.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
-  const availableSlots = await getAvailableSlots({
-    barbershopId,
-    staffProfileId,
-    serviceId,
-    dateStr,
-  });
-
-  const slotStartMs = slotStart.getTime();
-  const isAvailable = availableSlots.some((s) => s.getTime() === slotStartMs);
+  // 6. Slot availability — re-check just before insert
+  // Extract the local date in barbershop timezone (not UTC) to pass to getAvailableSlots.
+  // new Date(s.start) correctly parses the local-ISO-with-offset returned by the
+  // availability engine back to a UTC instant for timestamp comparison.
+  const localDate = extractLocalDate(slotStart, DEFAULT_TIMEZONE);
+  const slotsResult = await getAvailableSlots({ barbershopId, staffProfileId, serviceId, date: localDate });
+  const availableSlots = slotsResult.mode === 'specific_staff' ? slotsResult.slots : [];
+  const isAvailable = availableSlots.some(
+    (s) => new Date(s.start).getTime() === slotStart.getTime(),
+  );
   if (!isAvailable) throw new SlotNotAvailableError();
 
   // 7. Resolve deposit config and determine initial status
@@ -123,7 +178,7 @@ export async function createBooking(
 
   const initialStatus: Appointment['status'] = depositConfig ? 'pending_deposit' : 'confirmed';
 
-  // Compute slot end
+  // Compute slot end — buffer included in range for exclusion constraint, not exposed to clients
   const slotEnd = new Date(
     slotStart.getTime() + (service.durationMinutes + bufferMinutes) * 60_000,
   );
@@ -226,10 +281,26 @@ function resolveDepositConfig({
 
   // Service has depositRequired but incomplete config (no type/value)
   if (service.depositRequired) {
-    // Fall through to barbershop default, already checked above and missing
     throw new DepositConfigurationMissingError(customer.barbershopId);
   }
 
   // Barbershop trigger fired but no default configured
   throw new DepositConfigurationMissingError(customer.barbershopId);
+}
+
+/**
+ * Returns the YYYY-MM-DD date string as observed in the given IANA timezone.
+ * Used to extract the correct local date from a UTC instant before querying
+ * the availability engine — avoids the UTC-midnight rollover problem.
+ */
+function extractLocalDate(date: Date, timezone: string): string {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = fmt.formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${get('year')}-${get('month')}-${get('day')}`;
 }
