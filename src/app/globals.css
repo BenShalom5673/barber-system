@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+@theme {
+  /* ─── Colors ──────────────────────────────────────────────────────────────── */
+  --color-surface:      #F7F7F5;
+  --color-card:         #FFFFFF;
+  --color-foreground:   #1C1C1E;
+  --color-muted:        #6B6B6E;
+  --color-border:       #E5E5E5;
+  --color-accent:       #C6A96B;
+  --color-accent-hover: #B89658;
+  --color-accent-light: #F3E9D2;
+  --color-success:      #2E7D32;
+  --color-error:        #C62828;
+
+  /* ─── Border radius ───────────────────────────────────────────────────────── */
+  --radius-card:   14px;
+  --radius-button: 10px;
+}
+
+@layer utilities {
+  .shadow-card {
+    box-shadow: 0 2px 16px 0 rgba(28, 28, 30, 0.07);
+  }
+  .shadow-card-hover {
+    box-shadow: 0 4px 24px 0 rgba(28, 28, 30, 0.12);
+  }
+}

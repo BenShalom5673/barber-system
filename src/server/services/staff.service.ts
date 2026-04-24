@@ -1,5 +1,6 @@
 import {
   findActiveStaffByBarbershop,
+  findActiveStaffForService,
   findStaffById,
   createStaffProfile,
   updateStaffProfile,
@@ -32,6 +33,17 @@ export interface UpdateStaffParams {
  */
 export async function listStaff(barbershopId: string): Promise<StaffProfile[]> {
   return findActiveStaffByBarbershop(barbershopId);
+}
+
+/**
+ * Returns active staff who can perform the given service.
+ * Applies the per-staff eligibility rule: no staff_services rows = all services offered.
+ */
+export async function listStaffForService(
+  barbershopId: string,
+  serviceId: string,
+): Promise<StaffProfile[]> {
+  return findActiveStaffForService(barbershopId, serviceId);
 }
 
 /**

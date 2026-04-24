@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listStaff, createStaff, type CreateStaffParams } from '@/server/services/staff.service';
+import { listStaffForService, createStaff, type CreateStaffParams } from '@/server/services/staff.service';
 import {
   guardInternalToken,
   resolveDevBarbershopId,
@@ -7,14 +7,25 @@ import {
   mapDomainError,
 } from '@/server/lib/route-utils';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(request: Request): Promise<NextResponse> {
-  const guard = guardInternalToken(request);
-  if (guard) return guard as NextResponse;
+  const { searchParams } = new URL(request.url);
+  const serviceId = searchParams.get('serviceId');
+
+  if (!serviceId) {
+    return NextResponse.json({ error: 'serviceId query parameter is required.' }, { status: 400 });
+  }
+  if (!UUID_REGEX.test(serviceId)) {
+    return NextResponse.json({ error: 'serviceId must be a valid UUID.' }, { status: 400 });
+  }
 
   try {
     const barbershopId = resolveDevBarbershopId();
-    const staff = await listStaff(barbershopId);
-    return NextResponse.json(staff);
+    const staff = await listStaffForService(barbershopId, serviceId);
+    return NextResponse.json(
+      staff.map((s) => ({ id: s.id, displayName: s.displayName, bio: s.bio })),
+    );
   } catch (err) {
     return mapDomainError(err);
   }

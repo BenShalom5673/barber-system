@@ -14,10 +14,7 @@ import {
 const SERVICE_TYPES = new Set(['direct_booking', 'consultation_only']);
 const DEPOSIT_TYPES = new Set(['percentage', 'fixed']);
 
-export async function GET(request: Request): Promise<NextResponse> {
-  const guard = guardInternalToken(request);
-  if (guard) return guard as NextResponse;
-
+export async function GET(_request: Request): Promise<NextResponse> {
   try {
     const barbershopId = resolveDevBarbershopId();
     const svcs = await listServices(barbershopId);
