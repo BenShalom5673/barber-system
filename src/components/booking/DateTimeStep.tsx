@@ -1,27 +1,152 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+
+interface SlotEntry {
+  start: string;
+  end: string;
+}
+
+type SlotsResponse =
+  | { mode: 'specific_staff' | 'single_staff'; slots: SlotEntry[] }
+  | { mode: 'multi_staff' };
+
 interface Props {
-  onNext: () => void;
+  barbershopId: string;
+  serviceId: string;
+  staffProfileId?: string | null;
+  onNext: (slotStart: string) => void;
   onBack: () => void;
 }
 
-export default function DateTimeStep({ onNext, onBack }: Props) {
+function localTime(iso: string): string {
+  return iso.split('T')[1]?.slice(0, 5) ?? '';
+}
+
+export default function DateTimeStep({ barbershopId, serviceId, staffProfileId, onNext, onBack }: Props) {
+  const [date, setDate] = useState('');
+  const [slots, setSlots] = useState<SlotEntry[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // DEBUG render-level log — fires every render
+  console.log('[DateTimeStep] INIT', { barbershopId, serviceId, staffProfileId, date });
+
+  useEffect(() => {
+    // DEBUG effect-level log — fires on mount and when deps change
+    console.log('[DateTimeStep] EFFECT RUN', { barbershopId, serviceId, staffProfileId, date });
+
+    if (!date || !serviceId || !barbershopId) {
+      console.log('[DateTimeStep] skipping fetch — missing:', {
+        date: !date,
+        serviceId: !serviceId,
+        barbershopId: !barbershopId,
+      });
+      return;
+    }
+
+    setLoading(true);
+    setSlots([]);
+    setSelected(null);
+    setError(null);
+
+    const params = new URLSearchParams({ barbershopId, serviceId, date });
+    if (staffProfileId) params.set('staffProfileId', staffProfileId);
+
+    const url = `/api/availability?${params}`;
+    console.log('[DateTimeStep] fetching:', url);
+
+    fetch(url)
+      .then((r) => r.json())
+      .then((res: SlotsResponse) => {
+        console.log('[DateTimeStep] response:', JSON.stringify(res));
+        if (res.mode === 'multi_staff') {
+          setError('לא נבחר ספר — אנא חזור ובחר ספר');
+          return;
+        }
+        setSlots(res.slots);
+      })
+      .catch((err: unknown) => {
+        console.error('[DateTimeStep] fetch error:', err);
+        setError('שגיאה בטעינת שעות זמינות');
+      })
+      .finally(() => setLoading(false));
+  }, [date, serviceId, staffProfileId, barbershopId]);
+
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
-    <div className="p-6 sm:p-10 flex flex-col items-center">
-      <div className="w-full max-w-[480px]">
+    <div className="flex flex-col">
 
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-foreground mb-1">בחר תאריך ושעה</h2>
-          <p className="text-sm text-muted">מתי תרצה להגיע?</p>
+      <div className="p-6 sm:p-10 flex flex-col items-center">
+        <div className="w-full max-w-[480px]">
+
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-foreground mb-1">בחר תאריך ושעה</h2>
+            <p className="text-sm text-muted">מתי תרצה להגיע?</p>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-xs font-medium text-foreground mb-1.5">תאריך</label>
+            <input
+              type="date"
+              value={date}
+              min={today}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full h-10 px-3 rounded-button border border-border bg-card text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
+              dir="ltr"
+            />
+          </div>
+
+          <div className="min-h-[100px]">
+            {loading && (
+              <div className="flex flex-wrap gap-2">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="w-16 h-10 rounded-button border border-border bg-border/40 animate-pulse" />
+                ))}
+              </div>
+            )}
+
+            {!loading && error && (
+              <p className="text-sm text-muted text-center py-4">{error}</p>
+            )}
+
+            {!loading && !error && date && slots.length === 0 && (
+              <p className="text-sm text-muted text-center py-4">אין שעות פנויות בתאריך זה</p>
+            )}
+
+            {!loading && !error && slots.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {slots.map((slot) => (
+                  <button
+                    key={slot.start}
+                    type="button"
+                    onClick={() => setSelected(slot.start === selected ? null : slot.start)}
+                    className={[
+                      'px-4 py-2 rounded-button text-sm font-medium border transition-colors',
+                      slot.start === selected
+                        ? 'bg-accent text-white border-accent'
+                        : 'bg-card text-foreground border-border hover:border-accent',
+                    ].join(' ')}
+                  >
+                    {localTime(slot.start)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
+      </div>
 
-        <div className="mb-10 min-h-[200px] rounded-card border border-border bg-surface flex items-center justify-center">
-          <p className="text-sm text-muted">לוח שנה ושעות — יתווסף בשלב הבא</p>
-        </div>
-
-        <div className="flex justify-between items-center">
+      <div className="border-t border-border px-6 sm:px-10 py-5">
+        <div className="w-full max-w-[480px] mx-auto flex justify-between items-center">
           <button
             type="button"
-            onClick={onNext}
-            className="px-6 py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-button transition-colors"
+            onClick={() => { if (selected) onNext(selected); }}
+            disabled={!selected}
+            className="px-6 py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-button transition-colors"
           >
             המשך
           </button>
@@ -33,8 +158,8 @@ export default function DateTimeStep({ onNext, onBack }: Props) {
             חזור
           </button>
         </div>
-
       </div>
+
     </div>
   );
 }

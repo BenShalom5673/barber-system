@@ -21,6 +21,7 @@ export interface CreateServiceParams {
   serviceType?: 'direct_booking' | 'consultation_only';
   availableForOnlineBooking?: boolean;
   displayOrder?: number;
+  priceIsStarting?: boolean;
   depositRequired?: boolean;
   depositType?: 'percentage' | 'fixed' | null;
   depositValue?: number | null;
@@ -37,6 +38,7 @@ export interface UpdateServiceParams {
   serviceType?: 'direct_booking' | 'consultation_only';
   availableForOnlineBooking?: boolean;
   displayOrder?: number;
+  priceIsStarting?: boolean;
   depositRequired?: boolean;
   depositType?: 'percentage' | 'fixed' | null;
   depositValue?: number | null;
@@ -64,6 +66,7 @@ export async function createService(
     serviceType: params.serviceType ?? 'direct_booking',
     availableForOnlineBooking: params.availableForOnlineBooking ?? true,
     displayOrder: params.displayOrder ?? 0,
+    priceIsStarting: params.priceIsStarting ?? false,
     depositRequired: params.depositRequired ?? false,
     depositType: params.depositType ?? null,
     depositValue: params.depositValue ?? null,
@@ -92,6 +95,7 @@ export async function updateService(
       availableForOnlineBooking: params.availableForOnlineBooking,
     }),
     ...(params.displayOrder !== undefined && { displayOrder: params.displayOrder }),
+    ...(params.priceIsStarting !== undefined && { priceIsStarting: params.priceIsStarting }),
     ...(params.depositRequired !== undefined && { depositRequired: params.depositRequired }),
     ...(params.depositType !== undefined && { depositType: params.depositType }),
     ...(params.depositValue !== undefined && { depositValue: params.depositValue }),

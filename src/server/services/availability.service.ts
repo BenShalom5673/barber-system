@@ -293,8 +293,6 @@ async function computeSlotsForStaff(
     bufferMinutes,
   );
 
-  if (candidates.length === 0) return [];
-
   const existingAppointments = await findActiveAppointmentsForStaffInWindow(
     staffProfileId,
     windowStart,
@@ -317,9 +315,44 @@ async function computeSlotsForStaff(
 
   const allBlockedRanges = [...bookedRanges, ...blockedRanges];
 
+  // Inject gap-start candidates: when a blocked range ends mid-grid, offer the
+  // exact boundary as a start if the service + buffer fits before the window end.
+  // This prevents tight gaps from being silently skipped by the fixed grid.
+  const FIVE_MIN_MS = 5 * 60_000;
+  const windowStartMs = windowStart.getTime();
+  const windowEndMs = windowEnd.getTime();
+
+  // Gap-based propagation: from each blocked range's end, step forward in
+  // service-duration increments. Only 5-minute-aligned candidates are kept —
+  // all service durations are configured in 5-minute increments so this is lossless.
+  const gapCandidates: Date[] = [];
+  for (const range of allBlockedRanges) {
+    let t = range.end.getTime();
+    while (t + slotBlockMs <= windowEndMs) {
+      if (t % FIVE_MIN_MS === 0 && t >= windowStartMs) {
+        gapCandidates.push(new Date(t));
+      }
+      t += serviceDurationMs;
+    }
+  }
+
+  // Merge grid candidates and gap candidates, deduplicate by timestamp, sort ascending
+  const seen = new Set<number>();
+  const allCandidates: Date[] = [];
+  for (const c of [...candidates, ...gapCandidates]) {
+    const ms = c.getTime();
+    if (!seen.has(ms)) {
+      seen.add(ms);
+      allCandidates.push(c);
+    }
+  }
+  allCandidates.sort((a, b) => a.getTime() - b.getTime());
+
+  if (allCandidates.length === 0) return [];
+
   const slots: SlotEntry[] = [];
 
-  for (const slotStart of candidates) {
+  for (const slotStart of allCandidates) {
     // Overlap check uses slotBlockMs (duration + buffer) to prevent back-to-back booking
     const slotBlockEnd = new Date(slotStart.getTime() + slotBlockMs);
     const overlaps = allBlockedRanges.some((b) =>

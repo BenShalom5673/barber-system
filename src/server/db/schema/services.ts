@@ -15,6 +15,8 @@ export const services = pgTable('services', {
   durationMinutes: integer('duration_minutes').notNull(),
   // Price in agorot (ILS × 100)
   priceAgorot: integer('price_agorot').notNull(),
+  // When true, price is displayed as "starting from" (e.g. colour services with variable pricing)
+  priceIsStarting: boolean('price_is_starting').notNull().default(false),
   vatApplicable: boolean('vat_applicable').notNull().default(true),
   serviceType: serviceTypeEnum('service_type').notNull().default('direct_booking'),
   isActive: boolean('is_active').notNull().default(true),

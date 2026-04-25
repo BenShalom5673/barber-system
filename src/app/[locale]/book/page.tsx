@@ -11,9 +11,9 @@ import ConfirmStep from '@/components/booking/ConfirmStep';
 
 interface BookingData {
   serviceId?: string;
-  staffProfileId?: string;
-  date?: string;
-  time?: string;
+  staffProfileId?: string | null;
+  staffName?: string;
+  slotStart?: string;
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
@@ -23,10 +23,12 @@ interface BookingData {
 
 interface ServiceApiRow {
   id: string;
+  barbershopId: string;
   name: string;
   nameHe: string | null;
   durationMinutes: number;
   priceAgorot: number;
+  priceIsStarting: boolean;
   availableForOnlineBooking: boolean;
 }
 
@@ -45,11 +47,14 @@ export default function BookPage() {
   const [data, setData] = useState<BookingData>({});
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
+  const [barbershopId, setBarbershopId] = useState('');
 
   useEffect(() => {
     fetch('/api/services')
       .then((r) => r.json())
       .then((rows: ServiceApiRow[]) => {
+        const first = rows[0];
+        if (first) setBarbershopId(first.barbershopId);
         setServices(
           rows
             .filter((s) => s.availableForOnlineBooking)
@@ -58,6 +63,7 @@ export default function BookPage() {
               name: s.nameHe ?? s.name,
               durationMinutes: s.durationMinutes,
               priceAgorot: s.priceAgorot,
+              priceIsStarting: s.priceIsStarting,
             })),
         );
       })
@@ -73,15 +79,25 @@ export default function BookPage() {
     next();
   };
 
+  const handleStaffNext = (staffProfileId: string, staffName: string) => {
+    setData((d) => ({ ...d, staffProfileId, staffName }));
+    next();
+  };
+
+  const handleDateTimeNext = (slotStart: string) => {
+    setData((d) => ({ ...d, slotStart }));
+    next();
+  };
+
   const handleCustomerChange = (patch: Partial<BookingData>) =>
     setData((d) => ({ ...d, ...patch }));
 
   const content = [
     <ServiceStep  key="service"  services={services} onNext={handleServiceNext} />,
-    <StaffStep    key="staff"    onNext={next} onBack={back} />,
-    <DateTimeStep key="datetime" onNext={next} onBack={back} />,
+    <StaffStep    key="staff"    serviceId={data.serviceId ?? ''} onNext={handleStaffNext} onBack={back} />,
+    <DateTimeStep key="datetime" barbershopId={barbershopId} serviceId={data.serviceId ?? ''} staffProfileId={data.staffProfileId ?? null} onNext={handleDateTimeNext} onBack={back} />,
     <CustomerStep key="details"  data={data} onChange={handleCustomerChange} onNext={next} onBack={back} />,
-    <ConfirmStep  key="confirm"  onBack={back} />,
+    <ConfirmStep  key="confirm"  data={{}} onBack={back} />,
   ];
 
   const serviceStepLoading = (

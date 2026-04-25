@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { bookAppointment } from '@/server/services/booking.service';
 import {
-  guardInternalToken,
   resolveDevBarbershopId,
   parseBody,
   mapDomainError,
@@ -31,9 +30,6 @@ function isValidCalendarDate(v: string): boolean {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const guard = guardInternalToken(request);
-  if (guard) return guard as NextResponse;
-
   try {
     const barbershopId = resolveDevBarbershopId();
 

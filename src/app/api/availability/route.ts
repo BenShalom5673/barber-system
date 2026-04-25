@@ -12,7 +12,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const barbershopId   = searchParams.get('barbershopId');
   const serviceId      = searchParams.get('serviceId');
   const date           = searchParams.get('date');
-  const staffProfileId = searchParams.get('staffProfileId') ?? undefined;
+  const staffProfileId = searchParams.get('staffProfileId');
 
   if (!barbershopId || !serviceId || !date) {
     return NextResponse.json(
@@ -22,7 +22,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const result = await getAvailableSlots({ barbershopId, serviceId, date, staffProfileId });
+    const result = await getAvailableSlots({
+      barbershopId,
+      serviceId,
+      date,
+      ...(staffProfileId ? { staffProfileId } : {}),
+    });
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof Error && err.message === 'Invalid date.') {

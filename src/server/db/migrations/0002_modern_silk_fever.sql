@@ -1,0 +1,1 @@
+ALTER TABLE "services" ADD COLUMN "price_is_starting" boolean DEFAULT false NOT NULL;

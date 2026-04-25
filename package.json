@@ -10,7 +10,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:seed-dev": "dotenv -e .env.local -- tsx scripts/seed-dev.ts",
+    "db:seed-dev:reset": "dotenv -e .env.local -- tsx scripts/seed-dev.ts --reset"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
