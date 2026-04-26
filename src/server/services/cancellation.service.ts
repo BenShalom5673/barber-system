@@ -58,7 +58,7 @@ export async function cancelByClient(
   return updateAppointmentStatus(barbershopId, appointmentId, 'cancelled', {
     cancelledBy: 'client',
     cancelledAt: new Date(),
-    cancellationReason: reason,
+    ...(reason !== undefined && { cancellationReason: reason }),
   });
 }
 
@@ -82,7 +82,7 @@ export async function cancelByOwner(
   return updateAppointmentStatus(barbershopId, appointmentId, 'cancelled', {
     cancelledBy: 'owner',
     cancelledAt: new Date(),
-    cancellationReason: reason,
+    ...(reason !== undefined && { cancellationReason: reason }),
   });
 }
 
