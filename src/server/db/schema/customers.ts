@@ -11,7 +11,8 @@ export const customers = pgTable(
       .references(() => barbershops.id, { onDelete: 'cascade' }),
     // Phone stored in E.164 format, unique per barbershop
     phone: text('phone').notNull(),
-    name: text('name').notNull(),
+    firstName: text('first_name').notNull(),
+    lastName: text('last_name').notNull(),
     email: text('email'),
     birthDate: date('birth_date'),
     notes: text('notes'),

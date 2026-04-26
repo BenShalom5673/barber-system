@@ -1,5 +1,6 @@
 export interface CustomerStepData {
-  customerName?: string;
+  customerFirstName?: string;
+  customerLastName?: string;
   customerPhone?: string;
   customerEmail?: string;
   customerBirthDate?: string;
@@ -19,10 +20,26 @@ const inputClass = [
   'focus:outline-none focus:border-accent transition-colors',
 ].join(' ');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidIsraeliPhone(v: string): boolean {
+  const digits = v.replace(/\D/g, '');
+  return (
+    (digits.startsWith('0') && digits.length === 10) ||
+    (digits.startsWith('5') && digits.length === 9) ||
+    (digits.startsWith('972') && digits.length === 12)
+  );
+}
+
 export default function CustomerStep({ data, onChange, onNext, onBack }: Props) {
   const hasPromoData = !!(data.customerEmail?.trim() || data.customerBirthDate);
   const consentOk = !hasPromoData || !!data.marketingConsent;
-  const canContinue = !!data.customerName?.trim() && !!data.customerPhone?.trim() && consentOk;
+  const firstNameOk = (data.customerFirstName?.trim().length ?? 0) >= 2;
+  const lastNameOk  = (data.customerLastName?.trim().length ?? 0) >= 2;
+  const phoneOk     = isValidIsraeliPhone(data.customerPhone ?? '');
+  const emailOk     = !data.customerEmail?.trim() || EMAIL_REGEX.test(data.customerEmail.trim());
+  const birthDateOk = !data.customerBirthDate || new Date(data.customerBirthDate) <= new Date();
+  const canContinue = firstNameOk && lastNameOk && phoneOk && emailOk && birthDateOk && consentOk;
 
   return (
     <div className="flex flex-col">
@@ -39,14 +56,25 @@ export default function CustomerStep({ data, onChange, onNext, onBack }: Props) 
           {/* Required fields */}
           <div className="flex flex-col gap-4 mb-6">
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">שם מלא</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">שם פרטי</label>
               <input
                 type="text"
-                value={data.customerName ?? ''}
-                onChange={(e) => onChange({ customerName: e.target.value })}
+                value={data.customerFirstName ?? ''}
+                onChange={(e) => onChange({ customerFirstName: e.target.value })}
                 className={inputClass}
-                placeholder="ישראל ישראלי"
-                autoComplete="name"
+                placeholder="ישראל"
+                autoComplete="given-name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1.5">שם משפחה</label>
+              <input
+                type="text"
+                value={data.customerLastName ?? ''}
+                onChange={(e) => onChange({ customerLastName: e.target.value })}
+                className={inputClass}
+                placeholder="ישראלי"
+                autoComplete="family-name"
               />
             </div>
             <div>

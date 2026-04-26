@@ -57,7 +57,7 @@ export async function insertCustomerIfNotExists(data: NewCustomer): Promise<Cust
 export async function updateCustomerProfile(
   barbershopId: string,
   id: string,
-  data: { name?: string; email?: string; birthDate?: string },
+  data: { firstName?: string; lastName?: string; email?: string; birthDate?: string },
 ): Promise<Customer> {
   const result = await db
     .update(customers)

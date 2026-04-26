@@ -35,7 +35,8 @@ export interface BookAppointmentParams {
   serviceId: string;
   /** Local ISO with offset, e.g. "2026-04-26T12:00:00+03:00" */
   start: string;
-  customerName: string;
+  customerFirstName: string;
+  customerLastName: string;
   customerPhone: string;
   customerEmail?: string;
   /** YYYY-MM-DD */
@@ -79,7 +80,8 @@ export async function bookAppointment(
   const customer = await findOrCreateCustomer({
     barbershopId: params.barbershopId,
     phone: params.customerPhone,
-    name: params.customerName,
+    firstName: params.customerFirstName,
+    lastName: params.customerLastName,
     ...(params.customerEmail !== undefined && { email: params.customerEmail }),
     ...(params.customerBirthDate !== undefined && { birthDate: params.customerBirthDate }),
   });

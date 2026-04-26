@@ -63,9 +63,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'start is not a valid datetime.' }, { status: 400 });
     }
 
-    if (typeof body.customerName !== 'string' || !body.customerName.trim()) {
-      return NextResponse.json({ error: 'customerName is required.' }, { status: 400 });
+    if (typeof body.customerFirstName !== 'string' || !body.customerFirstName.trim()) {
+      return NextResponse.json({ error: 'customerFirstName is required.' }, { status: 400 });
     }
+    const customerFirstName = body.customerFirstName.trim();
+
+    if (typeof body.customerLastName !== 'string' || !body.customerLastName.trim()) {
+      return NextResponse.json({ error: 'customerLastName is required.' }, { status: 400 });
+    }
+    const customerLastName = body.customerLastName.trim();
 
     if (typeof body.customerPhone !== 'string' || !body.customerPhone.trim()) {
       return NextResponse.json({ error: 'customerPhone is required.' }, { status: 400 });
@@ -106,7 +112,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       staffProfileId: body.staffProfileId,
       serviceId: body.serviceId,
       start: body.start,
-      customerName: body.customerName.trim(),
+      customerFirstName,
+      customerLastName,
       customerPhone: body.customerPhone.trim(),
       ...(typeof body.customerEmail === 'string' && { customerEmail: body.customerEmail }),
       ...(typeof body.customerBirthDate === 'string' && {

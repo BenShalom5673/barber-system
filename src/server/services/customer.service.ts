@@ -9,7 +9,8 @@ import {
 export interface FindOrCreateCustomerParams {
   barbershopId: string;
   phone: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email?: string;
   /** YYYY-MM-DD */
   birthDate?: string;
@@ -18,7 +19,7 @@ export interface FindOrCreateCustomerParams {
 /**
  * Looks up a customer by (barbershopId, normalised phone).
  *
- * If the customer exists: updates name, email, and birthDate with any
+ * If the customer exists: updates firstName, lastName, email, and birthDate with any
  * non-empty values provided. Existing values are never overwritten with
  * null or empty string.
  *
@@ -36,8 +37,9 @@ export async function findOrCreateCustomer(
 
   const existing = await findCustomerByPhone(params.barbershopId, phone);
   if (existing) {
-    const updates: { name?: string; email?: string; birthDate?: string } = {};
-    if (params.name) updates.name = params.name;
+    const updates: { firstName?: string; lastName?: string; email?: string; birthDate?: string } = {};
+    if (params.firstName) updates.firstName = params.firstName;
+    if (params.lastName) updates.lastName = params.lastName;
     if (params.email) updates.email = params.email;
     if (params.birthDate) updates.birthDate = params.birthDate;
 
@@ -50,7 +52,8 @@ export async function findOrCreateCustomer(
   const inserted = await insertCustomerIfNotExists({
     barbershopId: params.barbershopId,
     phone,
-    name: params.name,
+    firstName: params.firstName,
+    lastName: params.lastName,
     email: params.email ?? null,
     birthDate: params.birthDate ?? null,
     status: 'active',

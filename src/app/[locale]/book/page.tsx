@@ -15,7 +15,8 @@ interface BookingData {
   staffProfileId?: string | null;
   staffName?: string;
   slotStart?: string;
-  customerName?: string;
+  customerFirstName?: string;
+  customerLastName?: string;
   customerPhone?: string;
   customerEmail?: string;
   customerBirthDate?: string;
@@ -108,7 +109,7 @@ export default function BookPage() {
     setData((d) => ({ ...d, ...patch }));
 
   const handleConfirm = async () => {
-    if (!data.serviceId || !data.staffProfileId || !data.slotStart || !data.customerName || !data.customerPhone) return;
+    if (!data.serviceId || !data.staffProfileId || !data.slotStart || !data.customerFirstName || !data.customerLastName || !data.customerPhone) return;
     setSubmitting(true);
     setBookingError(null);
     try {
@@ -119,7 +120,8 @@ export default function BookPage() {
           serviceId: data.serviceId,
           staffProfileId: data.staffProfileId,
           start: data.slotStart,
-          customerName: data.customerName,
+          customerFirstName: data.customerFirstName,
+          customerLastName: data.customerLastName,
           customerPhone: data.customerPhone,
           ...(data.customerEmail && { customerEmail: data.customerEmail }),
           ...(data.customerBirthDate && { customerBirthDate: data.customerBirthDate }),
@@ -154,7 +156,9 @@ export default function BookPage() {
           date: data.slotStart.slice(0, 10),
           time: (data.slotStart.split('T')[1] ?? '').slice(0, 5),
         }),
-        ...(data.customerName && { customerName: data.customerName }),
+        ...((data.customerFirstName || data.customerLastName) && {
+          customerName: [data.customerFirstName, data.customerLastName].filter(Boolean).join(' '),
+        }),
         ...(data.customerPhone && { customerPhone: data.customerPhone }),
       }}
       onConfirm={handleConfirm}

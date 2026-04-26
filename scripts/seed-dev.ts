@@ -247,7 +247,7 @@ async function seed(barbershopId: string): Promise<void> {
 
   const insertedCustomers = await db
     .insert(customers)
-    .values({ barbershopId, name: 'לקוח פיתוח', phone: '0500000000', notes: MARKER })
+    .values({ barbershopId, firstName: 'לקוח', lastName: 'פיתוח', phone: '0500000000', notes: MARKER })
     .returning();
 
   const customer = insertedCustomers[0];
