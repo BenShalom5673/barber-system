@@ -30,19 +30,8 @@ export default function DateTimeStep({ barbershopId, serviceId, staffProfileId, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // DEBUG render-level log — fires every render
-  console.log('[DateTimeStep] INIT', { barbershopId, serviceId, staffProfileId, date });
-
   useEffect(() => {
-    // DEBUG effect-level log — fires on mount and when deps change
-    console.log('[DateTimeStep] EFFECT RUN', { barbershopId, serviceId, staffProfileId, date });
-
     if (!date || !serviceId || !barbershopId) {
-      console.log('[DateTimeStep] skipping fetch — missing:', {
-        date: !date,
-        serviceId: !serviceId,
-        barbershopId: !barbershopId,
-      });
       return;
     }
 
@@ -55,20 +44,17 @@ export default function DateTimeStep({ barbershopId, serviceId, staffProfileId, 
     if (staffProfileId) params.set('staffProfileId', staffProfileId);
 
     const url = `/api/availability?${params}`;
-    console.log('[DateTimeStep] fetching:', url);
 
     fetch(url)
       .then((r) => r.json())
       .then((res: SlotsResponse) => {
-        console.log('[DateTimeStep] response:', JSON.stringify(res));
         if (res.mode === 'multi_staff') {
           setError('לא נבחר ספר — אנא חזור ובחר ספר');
           return;
         }
         setSlots(res.slots);
       })
-      .catch((err: unknown) => {
-        console.error('[DateTimeStep] fetch error:', err);
+      .catch(() => {
         setError('שגיאה בטעינת שעות זמינות');
       })
       .finally(() => setLoading(false));

@@ -182,7 +182,7 @@ export async function saveOperationalSettings(
       cancellationWindowMinutes: fields.cancellationWindowMinutes ?? 180,
       appointmentBufferMinutes: fields.appointmentBufferMinutes ?? 5,
       bookingHorizonDays: fields.bookingHorizonDays ?? 30,
-      slotIntervalMinutes: fields.slotIntervalMinutes ?? 15,
+      slotIntervalMinutes: fields.slotIntervalMinutes ?? 5,
       isOnlineBookingEnabled: fields.isOnlineBookingEnabled ?? true,
       defaultDepositType: fields.defaultDepositType ?? null,
       defaultDepositValue: fields.defaultDepositValue ?? null,
