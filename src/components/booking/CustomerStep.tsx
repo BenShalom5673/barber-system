@@ -91,6 +91,7 @@ export default function CustomerStep({ data, onChange, onNext, onBack }: Props) 
                   onChange={(e) => onChange({ customerBirthDate: e.target.value })}
                   className={inputClass}
                   dir="ltr"
+                  max={new Date().toISOString().slice(0, 10)}
                 />
               </div>
             </div>

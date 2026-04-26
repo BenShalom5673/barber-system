@@ -52,7 +52,7 @@ export default function DateTimeStep({ barbershopId, serviceId, staffProfileId, 
           setError('לא נבחר ספר — אנא חזור ובחר ספר');
           return;
         }
-        setSlots(res.slots);
+        setSlots(res.slots.filter((s) => new Date(s.start).getTime() >= Date.now()));
       })
       .catch(() => {
         setError('שגיאה בטעינת שעות זמינות');

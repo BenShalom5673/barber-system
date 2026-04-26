@@ -91,6 +91,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    if (
+      typeof body.customerBirthDate === 'string' &&
+      new Date(body.customerBirthDate) > new Date()
+    ) {
+      return NextResponse.json(
+        { error: 'customerBirthDate cannot be in the future.' },
+        { status: 400 },
+      );
+    }
+
     const result = await bookAppointment({
       barbershopId,
       staffProfileId: body.staffProfileId,
