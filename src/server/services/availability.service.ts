@@ -23,8 +23,6 @@ import {
 
 // Fallback values used only when barbershop_settings row does not yet exist
 const DEFAULT_BUFFER_MINUTES = 5;
-// Default slot grid granularity — caller param > barbershop setting > this constant
-const DEFAULT_SLOT_INTERVAL_MINUTES = 5;
 // Assumption: all barbershops are in Asia/Jerusalem.
 // A per-barbershop timezone column does not exist on barbershop_settings yet.
 const DEFAULT_TIMEZONE = 'Asia/Jerusalem';
@@ -38,8 +36,6 @@ export interface GetAvailableSlotsParams {
   date: string;
   /** If provided, compute slots only for this staff member (eligibility rule still applies) */
   staffProfileId?: string;
-  /** Slot grid granularity in minutes. Overrides barbershop setting. Defaults to 5. */
-  slotIntervalMinutes?: number;
 }
 
 export interface SlotEntry {
@@ -157,9 +153,6 @@ export async function getAvailableSlots(
 
   const settings = await findBarbershopSettings(barbershopId);
   const bufferMinutes = settings?.appointmentBufferMinutes ?? DEFAULT_BUFFER_MINUTES;
-  // Precedence: caller param > barbershop setting > module default
-  const slotInterval =
-    params.slotIntervalMinutes ?? settings?.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES;
   const timezone = DEFAULT_TIMEZONE;
 
   // Day-of-week is identical for every staff member on a given date — compute once
@@ -178,7 +171,6 @@ export async function getAvailableSlots(
       date,
       dayOfWeek,
       timezone,
-      slotInterval,
       service.durationMinutes,
       bufferMinutes,
       serviceDurationMs,
@@ -212,7 +204,6 @@ export async function getAvailableSlots(
       date,
       dayOfWeek,
       timezone,
-      slotInterval,
       service.durationMinutes,
       bufferMinutes,
       serviceDurationMs,
@@ -247,7 +238,6 @@ async function computeSlotsForStaff(
   date: string,
   dayOfWeek: number,
   timezone: string,
-  slotInterval: number,
   serviceDurationMinutes: number,
   bufferMinutes: number,
   serviceDurationMs: number,
@@ -288,7 +278,7 @@ async function computeSlotsForStaff(
   const candidates = generateCandidateSlots(
     windowStart,
     windowEnd,
-    slotInterval,
+    serviceDurationMinutes + bufferMinutes,
     serviceDurationMinutes,
     bufferMinutes,
   );
@@ -332,7 +322,7 @@ async function computeSlotsForStaff(
       if (t % FIVE_MIN_MS === 0 && t >= windowStartMs) {
         gapCandidates.push(new Date(t));
       }
-      t += serviceDurationMs;
+      t += slotBlockMs;
     }
   }
 
