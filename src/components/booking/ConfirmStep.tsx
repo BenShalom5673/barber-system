@@ -19,6 +19,9 @@ interface ConfirmData {
 
 interface Props {
   data: ConfirmData;
+  onConfirm: () => void;
+  isSubmitting?: boolean;
+  bookingError?: string | null;
   onBack: () => void;
 }
 
@@ -31,7 +34,7 @@ function priceStr(agorot: number, isStarting?: boolean): string {
   return isStarting ? `החל מ-${shekelStr(agorot)}` : shekelStr(agorot);
 }
 
-export default function ConfirmStep({ data, onBack }: Props) {
+export default function ConfirmStep({ data, onConfirm, isSubmitting, bookingError, onBack }: Props) {
   const service = data.selectedService;
   const mode = data.paymentMode ?? 'pay_at_shop';
 
@@ -144,21 +147,27 @@ export default function ConfirmStep({ data, onBack }: Props) {
 
       {/* Footer */}
       <div className="border-t border-border px-6 sm:px-10 py-5 flex justify-center">
-        <div className="w-full max-w-[480px] flex justify-between items-center">
-          <button
-            type="button"
-            disabled={!canConfirm}
-            className="px-6 py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-button transition-colors"
-          >
-            {confirmLabel}
-          </button>
-          <button
-            type="button"
-            onClick={onBack}
-            className="px-4 py-2.5 text-sm text-muted hover:text-foreground transition-colors"
-          >
-            חזור
-          </button>
+        <div className="w-full max-w-[480px]">
+          <div className="flex justify-between items-center">
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={!canConfirm || !!isSubmitting}
+              className="px-6 py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-button transition-colors"
+            >
+              {isSubmitting ? 'שולח...' : confirmLabel}
+            </button>
+            <button
+              type="button"
+              onClick={onBack}
+              className="px-4 py-2.5 text-sm text-muted hover:text-foreground transition-colors"
+            >
+              חזור
+            </button>
+          </div>
+          {bookingError && (
+            <p className="text-sm text-red-500 mt-3 text-center">{bookingError}</p>
+          )}
         </div>
       </div>
 

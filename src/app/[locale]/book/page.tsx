@@ -11,6 +11,7 @@ import ConfirmStep from '@/components/booking/ConfirmStep';
 
 interface BookingData {
   serviceId?: string;
+  selectedService?: { name: string; priceAgorot: number; priceIsStarting?: boolean };
   staffProfileId?: string | null;
   staffName?: string;
   slotStart?: string;
@@ -48,6 +49,9 @@ export default function BookPage() {
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [barbershopId, setBarbershopId] = useState('');
+  const [booked, setBooked] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/services')
@@ -75,7 +79,18 @@ export default function BookPage() {
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const handleServiceNext = (serviceId: string) => {
-    setData((d) => ({ ...d, serviceId }));
+    const service = services.find((s) => s.id === serviceId);
+    setData((d) => ({
+      ...d,
+      serviceId,
+      ...(service && {
+        selectedService: {
+          name: service.name,
+          priceAgorot: service.priceAgorot,
+          ...(service.priceIsStarting !== undefined && { priceIsStarting: service.priceIsStarting }),
+        },
+      }),
+    }));
     next();
   };
 
@@ -92,12 +107,61 @@ export default function BookPage() {
   const handleCustomerChange = (patch: Partial<BookingData>) =>
     setData((d) => ({ ...d, ...patch }));
 
+  const handleConfirm = async () => {
+    if (!data.serviceId || !data.staffProfileId || !data.slotStart || !data.customerName || !data.customerPhone) return;
+    setSubmitting(true);
+    setBookingError(null);
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: data.serviceId,
+          staffProfileId: data.staffProfileId,
+          start: data.slotStart,
+          customerName: data.customerName,
+          customerPhone: data.customerPhone,
+          ...(data.customerEmail && { customerEmail: data.customerEmail }),
+          ...(data.customerBirthDate && { customerBirthDate: data.customerBirthDate }),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setBookingError(body.error ?? 'שגיאה בשמירת ההזמנה');
+        return;
+      }
+      setBooked(true);
+    } catch {
+      setBookingError('שגיאה בשמירת ההזמנה');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const content = [
     <ServiceStep  key="service"  services={services} onNext={handleServiceNext} />,
     <StaffStep    key="staff"    serviceId={data.serviceId ?? ''} onNext={handleStaffNext} onBack={back} />,
     <DateTimeStep key="datetime" barbershopId={barbershopId} serviceId={data.serviceId ?? ''} staffProfileId={data.staffProfileId ?? null} onNext={handleDateTimeNext} onBack={back} />,
     <CustomerStep key="details"  data={data} onChange={handleCustomerChange} onNext={next} onBack={back} />,
-    <ConfirmStep  key="confirm"  data={{}} onBack={back} />,
+    <ConfirmStep
+      key="confirm"
+      data={{
+        bookingMode: 'specific',
+        ...(data.selectedService && { selectedService: data.selectedService }),
+        ...(data.staffProfileId !== undefined && { staffProfileId: data.staffProfileId }),
+        ...(data.staffName && { staffName: data.staffName }),
+        ...(data.slotStart && {
+          date: data.slotStart.slice(0, 10),
+          time: (data.slotStart.split('T')[1] ?? '').slice(0, 5),
+        }),
+        ...(data.customerName && { customerName: data.customerName }),
+        ...(data.customerPhone && { customerPhone: data.customerPhone }),
+      }}
+      onConfirm={handleConfirm}
+      isSubmitting={submitting}
+      bookingError={bookingError}
+      onBack={back}
+    />,
   ];
 
   const serviceStepLoading = (
@@ -122,6 +186,24 @@ export default function BookPage() {
       </div>
     </div>
   );
+
+  if (booked) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 py-10">
+        <div className="w-full max-w-[480px] bg-card rounded-card shadow-card p-10 text-center">
+          <h2 className="text-xl font-semibold text-foreground mb-3">ההזמנה אושרה!</h2>
+          <p className="text-sm text-muted mb-6">נשמח לראות אותך. נתראה בקרוב!</p>
+          <button
+            type="button"
+            onClick={() => { setBooked(false); setStep(0); setData({}); }}
+            className="px-6 py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-button transition-colors"
+          >
+            קביעת תור נוסף
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center px-4 py-10">
