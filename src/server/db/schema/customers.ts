@@ -20,6 +20,7 @@ export const customers = pgTable(
     // Set automatically when no_show_count reaches the policy threshold,
     // or manually by the owner. Triggers deposit requirement on next booking.
     depositRequired: boolean('deposit_required').notNull().default(false),
+    marketingConsent: boolean('marketing_consent').notNull().default(false),
     // Counts for no-show policy enforcement
     noShowCount: integer('no_show_count').notNull().default(0),
     lastNoShowAt: timestamp('last_no_show_at', { withTimezone: true }),
