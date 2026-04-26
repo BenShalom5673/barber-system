@@ -41,3 +41,6 @@ Stage B — repositories only:
   - customer_id = service recipient
   - booked_by_customer_id = verified booker
   - reminder recipient must be explicit.
+
+## Future Ideas
+- Add lastUsedAt to customer_sessions for session activity tracking
